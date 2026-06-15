@@ -3,7 +3,9 @@
 import argparse
 import asyncio
 import sys
+from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 from rich.console import Console
@@ -37,11 +39,21 @@ def main():
 
     parser = argparse.ArgumentParser(description="Horizon - AI-Driven Information Aggregation System")
     parser.add_argument("--hours", type=int, help="Force fetch from last N hours")
+    parser.add_argument(
+        "--date",
+        help="Fetch one local calendar day (YYYY-MM-DD) instead of a rolling window",
+    )
+    parser.add_argument(
+        "--timezone",
+        default="UTC",
+        help="Timezone used with --date, for example Asia/Bangkok",
+    )
     args = parser.parse_args()
 
     try:
-        # Load environment variables from .env file
-        load_dotenv()
+        # Load environment variables from .env file.
+        # override=True lets a project-local .env replace stale shell values.
+        load_dotenv(dotenv_path=".env", override=True)
 
         # Ensure we're in the project directory or use data/ in current dir
         data_dir = Path("data")
@@ -74,7 +86,34 @@ def main():
 
         # Create and run orchestrator
         orchestrator = HorizonOrchestrator(config, storage)
-        asyncio.run(orchestrator.run(force_hours=args.hours))
+        force_since = None
+        force_until = None
+        summary_date = None
+        if args.date is not None:
+            if not args.date.strip():
+                console.print("[bold red]❌ --date cannot be empty[/bold red]")
+                sys.exit(1)
+            try:
+                local_tz = ZoneInfo(args.timezone)
+                local_date = datetime.strptime(args.date, "%Y-%m-%d").date()
+            except ValueError as e:
+                console.print(f"[bold red]❌ Invalid --date/--timezone: {e}[/bold red]")
+                sys.exit(1)
+
+            local_start = datetime.combine(local_date, time.min, tzinfo=local_tz)
+            local_end = local_start + timedelta(days=1)
+            force_since = local_start.astimezone(timezone.utc)
+            force_until = local_end.astimezone(timezone.utc)
+            summary_date = local_date.isoformat()
+
+        asyncio.run(
+            orchestrator.run(
+                force_hours=args.hours,
+                force_since=force_since,
+                force_until=force_until,
+                summary_date=summary_date,
+            )
+        )
 
     except KeyboardInterrupt:
         console.print("\n[yellow]⚠️  Interrupted by user[/yellow]")

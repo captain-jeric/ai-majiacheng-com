@@ -195,6 +195,8 @@ class OpenAIClient(AIClient):
         base_url = config.base_url or self._DEFAULT_BASE_URLS.get(config.provider.value)
         if base_url:
             kwargs["base_url"] = base_url
+        if config.provider == AIProvider.OLLAMA:
+            kwargs["timeout"] = 30.0
 
         self.client = AsyncOpenAI(**kwargs)
         self.model = config.model
@@ -259,7 +261,13 @@ class OpenAIClient(AIClient):
                 input_tokens=getattr(usage, "prompt_tokens", 0),
                 output_tokens=getattr(usage, "completion_tokens", 0),
             )
-        return response.choices[0].message.content
+        message = response.choices[0].message
+        content = message.content or ""
+        if not content and self.provider == "ollama":
+            # Some local reasoning models exposed through Ollama's OpenAI API
+            # place their final text in the non-standard `reasoning` field.
+            content = getattr(message, "reasoning", "") or ""
+        return content
 
     async def _do_request(
         self,
@@ -282,6 +290,13 @@ class OpenAIClient(AIClient):
             request_kwargs["temperature"] = temperature
         if self.provider not in self._NO_RESPONSE_FORMAT:
             request_kwargs["response_format"] = {"type": "json_object"}
+        if self.provider == "ollama":
+            request_kwargs["extra_body"] = {
+                "think": False,
+                "options": {
+                    "num_ctx": 8192,
+                },
+            }
         return await self.client.chat.completions.create(**request_kwargs)
 
     @staticmethod
