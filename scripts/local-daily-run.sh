@@ -67,9 +67,10 @@ else
   git rm -rf . >/dev/null 2>&1 || true
   cd "$PROJECT_DIR"
 fi
-rsync -a --delete docs/ "$TMPDIR/"
 
 cd "$TMPDIR"
+git rm -r . >/dev/null 2>&1 || true
+cp -R "$PROJECT_DIR/docs/." "$TMPDIR/"
 git add -A
 if ! git diff --cached --quiet; then
   git commit -m "Publish AI briefing: $TARGET_DATE"
