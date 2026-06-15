@@ -92,15 +92,15 @@ class ContentAnalyzer:
             content_text = item.content
             if "--- Top Comments ---" in content_text:
                 main, comments_part = content_text.split("--- Top Comments ---", 1)
-                content_section = f"Content: {main.strip()[:800]}"
+                content_section = f"Content: {main.strip()[:600]}"
             else:
-                content_section = f"Content: {content_text[:1000]}"
+                content_section = f"Content: {content_text[:700]}"
 
         # Prepare discussion section (comments, engagement)
         discussion_parts = []
         if item.content and "--- Top Comments ---" in item.content:
             comments_part = item.content.split("--- Top Comments ---", 1)[1]
-            discussion_parts.append(f"Community Comments:\n{comments_part[:1500]}")
+            discussion_parts.append(f"Community Comments:\n{comments_part[:600]}")
 
         meta = item.metadata
         engagement_items = []
@@ -143,6 +143,7 @@ class ContentAnalyzer:
         response = await self.client.complete(
             system=CONTENT_ANALYSIS_SYSTEM,
             user=user_prompt,
+            max_tokens=1024,
         )
 
         # Parse JSON response with robust fallback

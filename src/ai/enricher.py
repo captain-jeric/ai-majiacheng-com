@@ -24,6 +24,48 @@ from .utils import parse_json_response
 from ..models import ContentItem
 
 
+ZH_ONLY_ENRICHMENT_SYSTEM = """You are a knowledgeable AI news editor writing for a Chinese technical audience.
+
+Given a high-scoring news item, its content, and optional web search results, produce a concise grounded Chinese analysis.
+
+Rules:
+- Write all text fields in Simplified Chinese.
+- Keep technical names and widely-used acronyms in English when natural.
+- Do not fabricate facts.
+- Use only information from the provided content and search results.
+- Return valid JSON only.
+- For sources, include 0-3 URLs only if they appear verbatim in the search results and are directly relevant; otherwise return [].
+"""
+
+ZH_ONLY_ENRICHMENT_USER = """请为下面这条 AI 新闻生成中文分析。
+
+新闻：
+- 标题：{title}
+- URL：{url}
+- 一句话摘要：{summary}
+- 评分：{score}/10
+- 评分原因：{reason}
+- 标签：{tags}
+
+正文：
+{content}
+{comments_section}
+
+搜索结果：
+{web_context}
+
+只返回 JSON：
+{{
+  "title_zh": "<中文短标题，不超过15个词>",
+  "whats_new_zh": "<1-2句话：具体发生了什么>",
+  "why_it_matters_zh": "<1-2句话：为什么重要，影响谁>",
+  "key_details_zh": "<1-2句话：关键技术细节、限制或背景>",
+  "background_zh": "<2-3句话：必要背景；如果不需要则为空字符串>",
+  "community_discussion_zh": "<1-2句话：如果有社区讨论则总结，否则为空字符串>",
+  "sources": ["<搜索结果中的URL>", "..."]
+}}"""
+
+
 class ContentEnricher:
     """Enriches high-scoring content items with background knowledge."""
 
@@ -35,6 +77,11 @@ class ContentEnricher:
         config = getattr(self.client, "config", None)
         concurrency = getattr(config, "enrichment_concurrency", 1)
         return max(concurrency, 1)
+
+    def _is_zh_only(self) -> bool:
+        config = getattr(self.client, "config", None)
+        languages = getattr(config, "languages", []) or []
+        return set(languages) == {"zh"}
 
     async def enrich_batch(self, items: List[ContentItem]) -> None:
         """Enrich items in-place with background knowledge.
@@ -113,19 +160,20 @@ class ContentEnricher:
             title=item.title,
             summary=item.ai_summary or item.title,
             tags=", ".join(item.ai_tags) if item.ai_tags else "",
-            content=content_text[:1000],
+            content=content_text[:700],
         )
 
         try:
             response = await self.client.complete(
                 system=CONCEPT_EXTRACTION_SYSTEM,
                 user=user_prompt,
+                max_tokens=256,
             )
             result = self._parse_json_response(response)
             if result is None:
                 return []
             queries = result.get("queries", [])
-            return queries[:3]
+            return queries[:2]
         except Exception:
             return []
 
@@ -150,10 +198,10 @@ class ContentEnricher:
         if item.content:
             if "--- Top Comments ---" in item.content:
                 main, comments_part = item.content.split("--- Top Comments ---", 1)
-                content_text = main.strip()[:4000]
-                comments_text = comments_part.strip()[:2000]
+                content_text = main.strip()[:2200]
+                comments_text = comments_part.strip()[:600]
             else:
-                content_text = item.content[:4000]
+                content_text = item.content[:2200]
 
         # Step 1: AI identifies concepts to explain
         queries = await self._extract_concepts(item, content_text)
@@ -173,21 +221,39 @@ class ContentEnricher:
         available_urls = {r["url"]: r["title"] for r in all_results if r.get("url")}
 
         # Step 3: AI generates background grounded in search results
-        user_prompt = CONTENT_ENRICHMENT_USER.format(
-            title=item.title,
-            url=str(item.url),
-            summary=item.ai_summary or item.title,
-            score=item.ai_score or 0,
-            reason=item.ai_reason or "",
-            tags=", ".join(item.ai_tags) if item.ai_tags else "",
-            content=content_text,
-            comments_section=f"\n**Community Comments:**\n{comments_text}" if comments_text else "",
-            web_context=web_context or "No web search results available.",
-        )
+        if self._is_zh_only():
+            system_prompt = ZH_ONLY_ENRICHMENT_SYSTEM
+            user_prompt = ZH_ONLY_ENRICHMENT_USER.format(
+                title=item.title,
+                url=str(item.url),
+                summary=item.ai_summary or item.title,
+                score=item.ai_score or 0,
+                reason=item.ai_reason or "",
+                tags=", ".join(item.ai_tags) if item.ai_tags else "",
+                content=content_text,
+                comments_section=f"\n社区讨论：\n{comments_text}" if comments_text else "",
+                web_context=web_context or "无可用搜索结果。",
+            )
+            max_tokens = 1536
+        else:
+            system_prompt = CONTENT_ENRICHMENT_SYSTEM
+            user_prompt = CONTENT_ENRICHMENT_USER.format(
+                title=item.title,
+                url=str(item.url),
+                summary=item.ai_summary or item.title,
+                score=item.ai_score or 0,
+                reason=item.ai_reason or "",
+                tags=", ".join(item.ai_tags) if item.ai_tags else "",
+                content=content_text,
+                comments_section=f"\n**Community Comments:**\n{comments_text}" if comments_text else "",
+                web_context=web_context or "No web search results available.",
+            )
+            max_tokens = 2048
 
         response = await self.client.complete(
-            system=CONTENT_ENRICHMENT_SYSTEM,
+            system=system_prompt,
             user=user_prompt,
+            max_tokens=max_tokens,
         )
 
         # Parse JSON response with robust fallback
@@ -248,6 +314,7 @@ class ContentEnricher:
                     'Return JSON:\n'
                     '{"title_zh": "<中文标题>", "summary_zh": "<用中文写1-2句摘要>"}'
                 ),
+                max_tokens=512,
             )
             result = self._parse_json_response(response)
             if result:
