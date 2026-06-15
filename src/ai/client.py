@@ -1,5 +1,6 @@
 """AI client abstraction supporting multiple providers."""
 
+import asyncio
 import os
 import re
 from abc import ABC, abstractmethod
@@ -478,16 +479,29 @@ class GeminiClient(AIClient):
         temperature = self.temperature if temperature is None else temperature
         max_tokens = self.max_tokens if max_tokens is None else max_tokens
 
-        response = await self.client.aio.models.generate_content(
-            model=self.model,
-            contents=user,
-            config=types.GenerateContentConfig(
-                system_instruction=system,
-                temperature=temperature,
-                max_output_tokens=max_tokens,
-                response_mime_type="application/json"
-            )
-        )
+        last_exc = None
+        for attempt in range(3):
+            try:
+                response = await self.client.aio.models.generate_content(
+                    model=self.model,
+                    contents=user,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system,
+                        temperature=temperature,
+                        max_output_tokens=max_tokens,
+                        response_mime_type="application/json"
+                    )
+                )
+                break
+            except Exception as exc:
+                last_exc = exc
+                message = str(exc).lower()
+                retryable = any(code in message for code in ("429", "500", "502", "503", "504"))
+                if attempt == 2 or not retryable:
+                    raise
+                await asyncio.sleep(2 ** attempt)
+        else:
+            raise last_exc or RuntimeError("Gemini request failed")
         usage = getattr(response, "usage_metadata", None)
         if usage is not None:
             total = getattr(usage, "total_token_count", 0) or 0

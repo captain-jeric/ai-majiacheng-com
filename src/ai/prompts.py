@@ -20,9 +20,17 @@ Respond with valid JSON only:
 
 If there are no duplicates at all, return: {{"duplicates": []}}"""
 
-CONTENT_ANALYSIS_SYSTEM = """You are an expert content curator helping filter important technical and academic information.
+CONTENT_ANALYSIS_SYSTEM = """You are an expert AI news curator helping filter important technical, academic, and industry information.
 
 Score content on a 0-10 scale based on importance and relevance:
+
+Hard relevance gate:
+- Score 0-2 if the item is not directly about AI/ML, foundation models,
+  agents, inference infrastructure, AI developer tools, AI research, AI
+  safety/policy, or major AI business moves.
+- General software engineering, WebAssembly, databases, browsers, or cloud
+  infrastructure content should not score above 2 unless the AI connection is
+  explicit and central to the item.
 
 **9-10: Groundbreaking** - Major breakthroughs, paradigm shifts, or highly significant announcements
 - New major version releases of widely-used technologies
@@ -30,33 +38,38 @@ Score content on a 0-10 scale based on importance and relevance:
 - Important industry-changing announcements
 
 **7-8: High Value** - Important developments worth immediate attention
-- Interesting technical deep-dives
-- Novel approaches to known problems
-- Insightful analysis or commentary
-- Valuable tools or libraries
+- Primary-source model, product, API, benchmark, policy, or infrastructure announcements
+- Original technical deep-dives with concrete implementation details
+- Novel research results, credible benchmarks, or reproducible open-source releases
+- Insightful analysis from recognized experts or publications
 
 **5-6: Interesting** - Worth knowing but not urgent
 - Incremental improvements
-- Useful tutorials
+- Useful tutorials for a timely or advanced topic
 - Moderate community interest
 
 **3-4: Low Priority** - Generic or routine content
 - Minor updates
 - Common knowledge
 - Overly promotional content
+- Shallow roundups, rewritten press releases, or listicles
 
 **0-2: Noise** - Not relevant or low quality
 - Spam or purely promotional
 - Off-topic content
 - Trivial updates
+- SEO-style tutorials, unverified claims, thin summaries, or content farms
 
 Consider:
 - Technical depth and novelty
 - Potential impact on the field
+- Whether the source is primary, authoritative, or offers original analysis
 - Quality of writing/presentation
 - Relevance to software engineering, AI/ML, and systems research
 - Community discussion quality: insightful comments, diverse viewpoints, and debates increase value
 - Engagement signals: high upvotes/favorites with substantive discussion indicate community-validated importance
+
+Be strict. A post should only score 7 or higher if a busy technical reader would likely benefit from reading it today.
 """
 
 CONTENT_ANALYSIS_USER = """Analyze the following content and provide a JSON response with:
@@ -134,7 +147,7 @@ Guidelines:
 - ONLY explain concepts and terms that are explicitly mentioned in the title, summary, or content
 - Use the web search results to ensure accuracy, especially for recent projects, tools, or events
 - If the news is self-explanatory and needs no background, return an empty string for both background fields
-- For **sources**: pick 1-3 URLs from the Web Search Results that you actually relied on for the background fields. Only use URLs that appear verbatim in the search results above — do not invent or modify URLs.
+- For **sources**: pick 0-3 URLs from the Web Search Results that are directly about the news item or a primary concept in it. Only use URLs that appear verbatim in the search results above — do not invent or modify URLs. If the available search results are generic, indirect, stale, or only loosely related, return an empty sources array.
 """
 
 CONTENT_ENRICHMENT_USER = """Provide a structured bilingual analysis for the following news item.

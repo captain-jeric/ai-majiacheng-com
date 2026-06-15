@@ -5,7 +5,7 @@
     "model": "gemini-2.5-flash",
     "api_key_env": "GOOGLE_API_KEY",
     "temperature": 0.2,
-    "max_tokens": 1024,
+    "max_tokens": 4096,
     "throttle_sec": 0,
     "analysis_concurrency": 3,
     "enrichment_concurrency": 2,
@@ -63,9 +63,9 @@
       }
     ],
     "hackernews": {
-      "enabled": true,
-      "fetch_top_stories": 20,
-      "min_score": 250
+      "enabled": false,
+      "fetch_top_stories": 50,
+      "min_score": 180
     },
     "rss": [
       {
@@ -89,8 +89,8 @@
       {
         "name": "MIT Technology Review",
         "url": "https://www.technologyreview.com/feed/",
-        "enabled": true,
-        "category": "ai-industry"
+        "enabled": false,
+        "category": "ai-research"
       },
       {
         "name": "Hugging Face Blog",
@@ -125,6 +125,36 @@
       {
         "name": "MarkTechPost",
         "url": "https://www.marktechpost.com/feed/",
+        "enabled": false,
+        "category": "ai-research"
+      },
+      {
+        "name": "TechCrunch AI",
+        "url": "https://techcrunch.com/category/artificial-intelligence/feed/",
+        "enabled": true,
+        "category": "ai-industry"
+      },
+      {
+        "name": "The Verge AI",
+        "url": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
+        "enabled": true,
+        "category": "ai-industry"
+      },
+      {
+        "name": "The Decoder",
+        "url": "https://the-decoder.com/feed/",
+        "enabled": true,
+        "category": "ai-industry"
+      },
+      {
+        "name": "SemiAnalysis",
+        "url": "https://semianalysis.com/feed/",
+        "enabled": true,
+        "category": "ai-infra"
+      },
+      {
+        "name": "Interconnects",
+        "url": "https://www.interconnects.ai/feed",
         "enabled": true,
         "category": "ai-research"
       },
@@ -204,25 +234,27 @@
       "period": "past_24_hours",
       "languages": ["All", "Python", "TypeScript"],
       "keywords": [
-        "ai",
-        "agent",
-        "agents",
         "llm",
+        "agentic",
+        "agents",
         "rag",
         "inference",
         "transformer",
+        "multimodal",
+        "reasoning",
         "diffusion",
         "embedding",
-        "copilot"
+        "fine-tuning",
+        "evals"
       ],
-      "min_stars": 20,
-      "max_items": 8
+      "min_stars": 80,
+      "max_items": 10
     }
   },
   "filtering": {
-    "ai_score_threshold": 5.8,
+    "ai_score_threshold": 7.0,
     "time_window_hours": 24,
-    "max_items": 10,
+    "max_items": 6,
     "category_groups": {
       "models": {
         "name": "Models and research",

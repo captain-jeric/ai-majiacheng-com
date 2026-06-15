@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run AI Majiacheng daily briefing locally with Ollama, then publish the docs.
+# Run AI Majiacheng daily briefing locally, then publish the docs.
 
 set -euo pipefail
 
@@ -16,19 +16,6 @@ cd "$PROJECT_DIR"
 exec >> "$LOG_DIR/daily-run.log" 2>&1
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S %Z')] Starting AI Majiacheng daily run"
-
-if ! curl -fsS http://localhost:11434/v1/models >/dev/null; then
-  echo "Ollama OpenAI-compatible endpoint is not reachable. Trying to start ollama serve..."
-  nohup ollama serve > "$LOG_DIR/ollama.log" 2>&1 &
-  sleep 5
-fi
-
-curl -fsS http://localhost:11434/v1/models >/dev/null
-
-if ! ollama list | awk '{print $1}' | grep -qx "gemma4:12b"; then
-  echo "Missing Ollama model gemma4:12b"
-  exit 1
-fi
 
 TARGET_DATE="$(
   python3 - <<'PY'
